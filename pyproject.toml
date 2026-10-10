@@ -1,0 +1,33 @@
+[project]
+name = "stridon"
+version = "1.0.0"
+description = "Translate books, documents and web articles into bilingual editions with AI or online translators."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Yellow", email = "pizza-glace@protonmail.com" }]
+dependencies = [
+    "anthropic>=1.0",
+    "beautifulsoup4>=4.12",
+    "lxml>=5.0",
+    "PyMuPDF>=1.24",
+    "requests>=2.31",
+    "rich>=13.0",
+    "trafilatura>=1.6",
+]
+
+[project.optional-dependencies]
+tokens = ["tiktoken>=0.5"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+stridon = "stridon.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["stridon*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
