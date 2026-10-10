@@ -25,6 +25,8 @@ USER = (
 
 
 class OllamaTranslator(LLMTranslator):
+    """A model served by Ollama, through its native /api/chat endpoint."""
+
     name = "ollama"
     default_system = SYSTEM
     min_wait = 2.0
@@ -39,6 +41,7 @@ class OllamaTranslator(LLMTranslator):
 
     @property
     def prompt(self):
+        """The custom prompt, or the literary translation prompt tuned for local models."""
         prompt = super().prompt
         if not self.config.prompt:
             prompt.user = USER

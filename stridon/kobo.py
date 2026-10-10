@@ -15,11 +15,13 @@ from pathlib import Path
 
 
 class KoboError(Exception):
-    pass
+    """The Kobo library cannot be read, or the chosen book cannot be used."""
 
 
 @dataclass
 class KoboBook:
+    """A book of the Kobo library."""
+
     title: str
     author: str
     path: Path | None
@@ -52,6 +54,7 @@ def _locate(mount: str | None) -> tuple[Path, Path, Path | None]:
 
 
 def list_books(mount: str | None) -> list[KoboBook]:
+    """Books of the e-reader mounted at `mount`, or of the Kobo desktop app if None."""
     database, kepub_dir, root = _locate(mount)
     # Work on a copy: the e-reader or the app may hold the database open
     with tempfile.TemporaryDirectory() as tmp:

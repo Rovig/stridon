@@ -19,6 +19,8 @@ AZURE_API_VERSION = "2024-10-21"
 
 
 class OpenAICompatTranslator(LLMTranslator):
+    """Any server implementing the OpenAI chat completions API (and Azure OpenAI)."""
+
     timeout = 120
 
     def __init__(self, config: ServiceConfig, name: str = "openai"):
@@ -46,6 +48,7 @@ class OpenAICompatTranslator(LLMTranslator):
         return f"{self.base}/chat/completions"
 
     def build_body(self, system: str, messages: list[dict], schema: dict | None = None, model: str | None = None) -> dict:
+        """Request body of a chat completion (also used for Batch API lines)."""
         model = model if model is not None else self.models.next()
         all_messages = ([{"role": "system", "content": system}] if system else []) + messages
         body = {"messages": all_messages}
@@ -106,11 +109,13 @@ class OpenAICompatTranslator(LLMTranslator):
     # -- OpenAI Batch API -------------------------------------------------
 
     def batch_line(self, custom_id: str, text: str) -> dict:
+        """One request line of a Batch API input file."""
         user = self.prompt.render_user(text, self.language.name)
         body = self.build_body(self.prompt.render_system(self.language.name), [{"role": "user", "content": user}])
         return {"custom_id": custom_id, "method": "POST", "url": "/v1/chat/completions", "body": body}
 
     def batch_upload(self, jsonl: bytes) -> str:
+        """Upload a Batch API input file; returns its file id."""
         response = requests.post(
             f"{self.base}/files",
             headers=self._headers(),
@@ -123,6 +128,7 @@ class OpenAICompatTranslator(LLMTranslator):
         return response.json()["id"]
 
     def batch_create(self, file_id: str, description: str) -> str:
+        """Start a batch job for an uploaded file; returns the batch id."""
         response = requests.post(
             f"{self.base}/batches",
             headers=self._headers(),
@@ -139,12 +145,14 @@ class OpenAICompatTranslator(LLMTranslator):
         return response.json()["id"]
 
     def batch_status(self, batch_id: str) -> dict:
+        """Status of a batch job."""
         response = requests.get(f"{self.base}/batches/{batch_id}", headers=self._headers(), timeout=60)
         if not response.ok:
             raise http_error(response, self.name)
         return response.json()
 
     def batch_download(self, file_id: str) -> str:
+        """Content of a batch output file (JSON Lines)."""
         response = requests.get(f"{self.base}/files/{file_id}/content", headers=self._headers(), timeout=300)
         if not response.ok:
             raise http_error(response, self.name)

@@ -24,6 +24,8 @@ NO_SAMPLING = ("claude-opus-5", "claude-sonnet-5", "claude-haiku-5", "claude-fab
 
 
 class ClaudeTranslator(LLMTranslator):
+    """Anthropic Claude through the Messages API."""
+
     name = "claude"
 
     def __init__(self, config: ServiceConfig):

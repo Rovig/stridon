@@ -24,15 +24,17 @@ TEXT_TAGS = ["p", "h1", "h2", "h3", "h4", "h5", "h6", "li", "blockquote"]
 
 
 class WebError(Exception):
-    pass
+    """The page could not be fetched or contains no article."""
 
 
 def is_url(value: str) -> bool:
+    """Whether the value is an http(s) URL."""
     parsed = urlparse(value)
     return parsed.scheme in ("http", "https") and bool(parsed.netloc)
 
 
 def fetch(url: str, user_agent: str) -> str:
+    """Download a web page; returns its HTML."""
     headers = {
         "User-Agent": user_agent,
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -51,6 +53,7 @@ def fetch(url: str, user_agent: str) -> str:
 
 
 def page_title(html: str) -> str:
+    """Title of a page, from og:title or <title>."""
     soup = BeautifulSoup(html, "html.parser")
     og = soup.find("meta", property="og:title")
     if og and og.get("content", "").strip():
@@ -210,6 +213,7 @@ def _epub_body(title, translated_title, url, paragraphs, results, bilingual) -> 
 
 
 def translate_url(url: str, engine: Engine, options: DocumentOptions) -> list[Path]:
+    """Translate a web article; returns the PDF and/or EPUB files."""
     html = fetch(url, options.user_agent)
     title = page_title(html)
     paragraphs = extract_article(html, url)

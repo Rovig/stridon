@@ -43,6 +43,8 @@ GOOGLE_CODES = {"zh-hans": "zh-CN", "zh": "zh-CN", "zh-hant": "zh-TW", "zh-yue":
 
 
 class GoogleTranslator(_WebTranslator):
+    """Google Translate through its free web endpoint."""
+
     name = "google"
     attempts = 4
 
@@ -76,6 +78,8 @@ DEEPL_ALIASES = {"en": "en-US", "pt": "pt-PT", "no": "nb", "zh-hans": "zh", "zh-
 
 
 class DeepLTranslator(_WebTranslator):
+    """DeepL through the RapidAPI 'DeepL Translator' service."""
+
     name = "deepl"
     attempts = 2
     min_wait = 30.0
@@ -114,6 +118,8 @@ CAIYUN_TYPES = {"zh": "auto2zh", "zh-hans": "auto2zh", "en": "auto2en", "ja": "a
 
 
 class CaiyunTranslator(_WebTranslator):
+    """Caiyun (Chinese, English and Japanese targets)."""
+
     name = "caiyun"
     attempts = 2
     min_wait = 60.0
@@ -143,6 +149,8 @@ class CaiyunTranslator(_WebTranslator):
 # -- Tencent TranSmart (free web endpoint) -----------------------------------
 
 class TencentTranslator(_WebTranslator):
+    """Tencent TranSmart through its free web endpoint (Chinese and English targets)."""
+
     name = "tencent"
     url = "https://transmart.qq.com/api/imt"
 

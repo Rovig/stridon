@@ -26,6 +26,8 @@ _SPLIT = re.compile(r"^\s*@@\s*$", re.M)
 
 
 class LLMTranslator(Translator):
+    """Base for LLM services: subclasses only implement `_complete`."""
+
     is_llm = True
     default_system = ""
     attempts = 3
@@ -45,6 +47,7 @@ class LLMTranslator(Translator):
 
     @property
     def prompt(self) -> Prompt:
+        """The custom prompt, or the service's default one."""
         if self.config.prompt:
             prompt = self.config.prompt
             return Prompt(user=prompt.user, system=prompt.system or self.default_system)
@@ -83,6 +86,7 @@ class LLMTranslator(Translator):
         return translation
 
     def translate_batch(self, texts: list[str], context: Context | None = None) -> list[str]:
+        """Translate several texts in one request (JSON output or @@ separators), or one by one if the answer does not match."""
         if len(texts) == 1:
             return [self.translate(texts[0], context)]
         try:

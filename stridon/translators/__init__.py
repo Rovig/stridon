@@ -16,6 +16,8 @@ from stridon.translators.base import (
 
 @dataclass(frozen=True)
 class Service:
+    """How to reach a translation service: implementation, URL, key variables, default model."""
+
     style: str  # which implementation handles it
     base: str | None = None
     env: tuple = ()
@@ -86,6 +88,7 @@ def _provider_service(name: str) -> Service:
 
 
 def resolve_key(name: str, service: Service, api_key: str | None) -> str:
+    """The API key from --api-key, STRIDON_<NAME>_KEY or the service's usual variable."""
     if api_key:
         return api_key
     for var in (f"STRIDON_{name.upper()}_KEY", *service.env):

@@ -33,6 +33,8 @@ class BlockedError(RetryableError):
 
 
 class GeminiTranslator(LLMTranslator):
+    """Google Gemini; switches to the next model when a passage is blocked."""
+
     name = "gemini"
     attempts = 7
     min_wait = 1.0

@@ -40,6 +40,7 @@ class KeyRing:
         return bool(self.keys)
 
     def next(self) -> str:
+        """The next value, in turn."""
         if not self._cycle:
             return ""
         with self._lock:
@@ -55,6 +56,7 @@ class Rotation:
         self._lock = threading.Lock()
 
     def next(self) -> str:
+        """The next value, in turn."""
         with self._lock:
             value = self.values[self._index % len(self.values)]
             self._index += 1
@@ -69,6 +71,7 @@ class Context:
         self.pairs = deque(maxlen=limit)
 
     def add(self, source: str, translation: str):
+        """Remember a translated pair (the oldest is dropped beyond the limit)."""
         if self.pairs.maxlen:
             self.pairs.append((source, translation))
 
@@ -78,6 +81,8 @@ class Context:
 
 @dataclass
 class ServiceConfig:
+    """Settings of a translation service, built from the command line."""
+
     service: str
     language: Language
     models: list[str] = field(default_factory=list)
@@ -140,5 +145,6 @@ class Translator:
         return [self.translate(text, context) for text in texts]
 
     def describe(self) -> str:
+        """Service name and models, for display."""
         models = ", ".join(self.config.models)
         return f"{self.name}" + (f" ({models})" if models else "")

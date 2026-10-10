@@ -12,3 +12,7 @@ dist/
 .*.batch.json
 .DS_Store
 .idea/
+# Documents translated from inside the project folder
+/*.pdf
+/*.epub
+/*.srt

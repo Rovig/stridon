@@ -111,6 +111,7 @@ class _Chapter:
         self.options = options
 
     def collect(self, units: list[Unit], tags: set[str], excluded: set[str]):
+        """Add this chapter's passages to `units` and remember where each one goes."""
         opts = self.options
         for element in _selected_elements(self.soup, tags):
             text = _text_without(element, excluded)
@@ -143,6 +144,7 @@ class _Chapter:
                     self.items.append(("alt", image, [len(units) - 1], None))
 
     def apply(self, results: list, excluded: set[str]) -> bool:
+        """Insert the available translations; returns True if the chapter changed."""
         changed = False
         for kind, node, indexes, sentences in self.items:
             translations = [results[i] for i in indexes]
@@ -234,6 +236,7 @@ def _chapter_selected(path: str, options: DocumentOptions) -> bool:
 # -- commands ---------------------------------------------------------------------
 
 def translate_epub(source: Path, engine: Engine, options: DocumentOptions) -> list[Path]:
+    """Translate an EPUB; returns the output file (translation only, or bilingual)."""
     book = EpubArchive(source)
     tags = _effective_tags(options)
     excluded = set(options.exclude_tags)

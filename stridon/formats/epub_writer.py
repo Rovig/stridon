@@ -20,6 +20,7 @@ p.stridon-translation { font-style: italic; }
 
 
 def chapter_xhtml(title: str, body: str, language: str) -> str:
+    """A complete XHTML 1.1/EPUB 3 chapter around a body fragment."""
     return (
         '<?xml version="1.0" encoding="utf-8"?>\n<!DOCTYPE html>\n'
         f'<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="{escape(language)}">\n'

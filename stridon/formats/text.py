@@ -34,6 +34,7 @@ def split_text(text: str, batch_lines: int) -> list[str]:
 
 
 def translate_txt(source: Path, engine: Engine, options: DocumentOptions) -> list[Path]:
+    """Translate a plain text file; returns the output file."""
     blocks = split_text(_read(source), options.batch_lines)
     units = [Unit("" if should_skip(b) else b) for b in blocks]
     results, error = translate(engine, units)
@@ -92,6 +93,7 @@ def split_markdown(text: str) -> list[tuple[str, bool]]:
 
 
 def translate_markdown(source: Path, engine: Engine, options: DocumentOptions) -> list[Path]:
+    """Translate a Markdown file, leaving code blocks and images untouched."""
     blocks = split_markdown(_read(source))
     units = [Unit(text if ok else "") for text, ok in blocks]
     results, error = translate(engine, units)
@@ -123,6 +125,7 @@ def parse_srt(text: str) -> list[tuple[str, str, str]]:
 
 
 def translate_srt(source: Path, engine: Engine, options: DocumentOptions) -> list[Path]:
+    """Translate SRT subtitles, keeping numbers and timings."""
     cues = parse_srt(_read(source))
     units = [Unit("" if should_skip(text) else text) for _, _, text in cues]
     results, error = translate(engine, units)

@@ -17,6 +17,8 @@ def _hash(text: str) -> str:
 
 
 class TranslationCache:
+    """Translations of one document, kept in memory and appended to a JSON Lines file."""
+
     def __init__(self, path: Path | None):
         self.path = path
         self.entries: dict[str, str] = {}
@@ -31,15 +33,18 @@ class TranslationCache:
 
     @classmethod
     def for_document(cls, directory: Path, name: str, settings: str) -> "TranslationCache":
+        """Cache file `.<name>.<settings hash>.stridon.jsonl` in `directory`."""
         return cls(directory / f".{name}.{_hash(settings)[:8]}.stridon.jsonl")
 
     def __len__(self):
         return len(self.entries)
 
     def get(self, text: str) -> str | None:
+        """Saved translation of `text`, or None."""
         return self.entries.get(_hash(text))
 
     def put(self, text: str, translation: str):
+        """Save a translation (thread-safe); it is written to disk immediately."""
         key = _hash(text)
         with self._lock:
             self.entries[key] = translation
@@ -48,6 +53,7 @@ class TranslationCache:
                     f.write(json.dumps({"k": key, "t": translation}, ensure_ascii=False) + "\n")
 
     def clear(self):
+        """Forget every saved translation and delete the cache file."""
         with self._lock:
             self.entries.clear()
             if self.path and self.path.exists():

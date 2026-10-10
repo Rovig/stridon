@@ -41,6 +41,7 @@ _DESCRIPTIVE = ("shows", "depicts", "illustrates", "demonstrates", "displays", "
 
 
 def looks_like_caption(text: str) -> bool:
+    """Whether a text block looks like a figure caption or an image credit."""
     if _CAPTION_LABEL.match(text) or _CREDIT.match(text):
         return True
     return len(text) < 200 and any(word in text.lower() for word in _DESCRIPTIVE)
@@ -48,6 +49,8 @@ def looks_like_caption(text: str) -> bool:
 
 @dataclass
 class Block:
+    """A text block or an image of a source page, in reading order."""
+
     page: int
     y: float
     kind: str  # "text" or "image"
@@ -128,11 +131,13 @@ class _Layout:
         self.y = MARGIN
 
     def new_page(self, width: float, height: float):
+        """Start a new output page of the given size."""
         self.width, self.height = width, height
         self.page = self.out.new_page(width=width, height=height)
         self.y = MARGIN
 
     def text(self, text: str, size: float, color: str, italic: bool = False):
+        """Write text at the current position."""
         bottom = self.height - MARGIN
         rect = pymupdf.Rect(MARGIN, self.y, self.width - MARGIN, bottom)
         if rect.height > 0:
@@ -153,6 +158,7 @@ class _Layout:
         self.text(" ".join(words[middle:]), size, color, italic)
 
     def image(self, block: Block):
+        """Draw an image at the current position, scaled down to fit."""
         area_width, area_height = self.width - 2 * MARGIN, self.height - 2 * MARGIN
         scale = min(1.0, area_width / block.width, area_height / block.height)
         width, height = block.width * scale, block.height * scale
@@ -167,6 +173,7 @@ class _Layout:
 
 
 def translate_pdf(source: Path, engine: Engine, options: DocumentOptions) -> list[Path]:
+    """Translate a PDF; returns the output files (a PDF, or a .txt and .epub in simple mode)."""
     if options.pdf_mode == "simple":
         return _translate_simple(source, engine, options)
 

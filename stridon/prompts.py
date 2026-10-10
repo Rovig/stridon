@@ -14,18 +14,22 @@ from pathlib import Path
 
 
 class PromptError(ValueError):
-    pass
+    """The custom prompt is invalid."""
 
 
 @dataclass
 class Prompt:
+    """A system message and a user template for LLM services."""
+
     user: str
     system: str = ""
 
     def render_user(self, text: str, language: str) -> str:
+        """The user message for `text`."""
         return _fill(self.user, text=text, language=language)
 
     def render_system(self, language: str) -> str:
+        """The system message."""
         return _fill(self.system, text="", language=language)
 
 

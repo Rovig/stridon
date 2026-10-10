@@ -12,6 +12,8 @@ TRANSLATION_COLOR = "#1e90ff"
 
 @dataclass
 class DocumentOptions:
+    """Output settings shared by the document formats (set from the command line)."""
+
     output: Path | None = None
     bilingual: bool = False  # True: original and translation alternate
     output_suffix: str = "_translated"  # e.g. "_fr", or "_bilingual"
@@ -54,6 +56,7 @@ def translate(engine: Engine, units: list[Unit]) -> tuple[list, BaseException | 
 
 
 def finish(outputs: list[Path], error: BaseException | None) -> list[Path]:
+    """Return the output files, or raise Stopped if the translation did not complete."""
     if error is not None:
         raise Stopped(error, outputs)
     return outputs
@@ -69,11 +72,13 @@ def output_path(source: Path, extension: str, options: DocumentOptions, partial:
 
 
 def safe_filename(title: str, fallback: str = "document") -> str:
+    """A file name made from a title (letters, digits, spaces, '-' and '_')."""
     name = re.sub(r"[^\w\s-]", "", title, flags=re.UNICODE).strip()[:50].strip()
     return name or fallback
 
 
 def escape(text: str) -> str:
+    """Escape text for HTML/XHTML."""
     return html.escape(text or "", quote=True)
 
 

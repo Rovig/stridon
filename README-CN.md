@@ -1,4 +1,4 @@
-**[English](./README.md) | 中文**
+**[English](./README.md) | [Français](./README-FR.md) | 中文**
 
 # Stridon
 
@@ -15,9 +15,21 @@ Stridon 使用 AI 模型或在线翻译服务翻译图书、文档和网页文�
 
 需要 Python 3.10 或更高版本。
 
+最简单的方式是使用 [pipx](https://pipx.pypa.io)，安装后可在任何目录使用 `stridon` 命令：
+
 ```shell
 git clone git@github.com:Rovig/stridon.git
+pipx install ./stridon
+```
+
+如果之后提示 `stridon` "command not found"，请运行 `pipx ensurepath` 并打开新的终端。`git pull` 之后更新：`pipx install --force ./stridon`（或一开始就用 `pipx install -e ./stridon` 安装，代码修改会立即生效）。
+
+不使用 pipx 时，可安装在虚拟环境中；只有在环境激活时才能使用该命令：
+
+```shell
 cd stridon
+python3 -m venv .venv
+source .venv/bin/activate
 pip install .
 ```
 
@@ -72,6 +84,7 @@ stridon book.epub -l zh --test
 - **Claude：** 如果模型拒绝翻译某段内容，请求会自动交由 Anthropic 推荐的备用模型重新处理。
 - **Gemini：** 已关闭安全拦截；某段内容被拦截时会切换到 `-m` 中的下一个模型。可用 `--interval` 放慢请求速度。
 - **Qwen-MT：** 专用翻译模型，不使用 `--prompt`，`--context` 会作为翻译记忆发送。
+- **彩云小译**仅支持译为简体中文、英文和日文；**腾讯交互翻译**仅支持译为简体中文和英文。
 - **自定义 API：** Stridon 发送 `POST {"text", "source_lang", "target_lang"}`，读取 `{"data": "<译文>"}`。
 
 ### 自定义服务商
@@ -176,3 +189,5 @@ docker run --rm -v "$PWD:/work" -e ANTHROPIC_API_KEY stridon book.epub -l zh -s 
 pip install -e ".[dev]"
 pytest
 ```
+
+代码结构以及如何添加服务或格式：[docs/architecture.md](docs/architecture.md)（英文）。

@@ -24,6 +24,7 @@ DEFAULT_TAGS = "p,h1,h2,h3,h4,h5,h6,li,blockquote,dt,dd"
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Command line options."""
     parser = argparse.ArgumentParser(
         prog="stridon",
         description="Translate EPUB, PDF, TXT, Markdown and SRT files or web articles into bilingual editions.",
@@ -155,6 +156,7 @@ def _run_document(source: str, engine: Engine, options: DocumentOptions, args) -
 
 
 def main(argv=None) -> int:
+    """Run the command line; returns the process exit code."""
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.proxy:

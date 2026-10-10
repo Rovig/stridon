@@ -23,6 +23,7 @@ QWEN_NAMES = {
 
 
 def qwen_language(name: str) -> str:
+    """The language name that Qwen-MT expects."""
     key = name.lower()
     if key in QWEN_NAMES:
         return QWEN_NAMES[key]
@@ -33,6 +34,8 @@ def qwen_language(name: str) -> str:
 
 
 class QwenTranslator(Translator):
+    """Alibaba Qwen-MT: raw text plus translation options, earlier translations as memory."""
+
     name = "qwen"
 
     def __init__(self, config: ServiceConfig):

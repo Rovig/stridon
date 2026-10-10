@@ -19,10 +19,12 @@ _ENTITY = re.compile(r"&([A-Za-z][A-Za-z0-9]*);")
 
 
 class EpubError(Exception):
-    pass
+    """The file is not a usable EPUB, or an EPUB operation failed."""
 
 
 class EpubArchive:
+    """The entries of an EPUB file, its package (manifest, spine) and chapters in reading order."""
+
     def __init__(self, path: Path):
         self.path = Path(path)
         try:
@@ -63,6 +65,7 @@ class EpubArchive:
         self.title = title.get_text(strip=True) if title else self.path.stem
 
     def images(self) -> list[str]:
+        """Paths of the image entries listed in the manifest."""
         return [path for path, media, _ in self.manifest.values() if media.startswith("image/") and path in self.entries]
 
     def save(self, path: Path, replacements: dict[str, bytes]):
@@ -105,6 +108,7 @@ def _decode(data: bytes) -> str:
 
 
 def is_well_formed(text: str) -> bool:
+    """Whether the text parses as strict XML."""
     try:
         etree.fromstring(_DECLARATION.sub("", text, count=1).encode("utf-8"), etree.XMLParser(recover=False))
         return True
@@ -131,6 +135,7 @@ def parse_document(data: bytes) -> BeautifulSoup:
 
 
 def serialize_document(soup: BeautifulSoup) -> bytes:
+    """The chapter as UTF-8 bytes, with its XML declaration set to UTF-8."""
     text = str(soup)
     # The chapter is always written as UTF-8
     text = re.sub(r"""^(\s*<\?xml[^>]*encoding=["'])[^"']+(["'])""", r"\g<1>utf-8\g<2>", text, count=1)

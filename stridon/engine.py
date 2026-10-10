@@ -51,6 +51,8 @@ class Interrupted(Exception):
 
 @dataclass
 class EngineOptions:
+    """How the engine groups, schedules and limits translation requests."""
+
     workers: int = 1
     block_size: int = 1
     token_budget: int = 0  # > 0: group paragraphs up to this many tokens
@@ -62,6 +64,8 @@ class EngineOptions:
 
 
 class Engine:
+    """Translates the units of a document with a translator and a cache."""
+
     def __init__(self, translator: Translator, cache: TranslationCache, options: EngineOptions | None = None):
         self.translator = translator
         self.cache = cache

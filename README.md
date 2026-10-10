@@ -1,4 +1,4 @@
-**English | [中文](./README-CN.md)**
+**English | [Français](./README-FR.md) | [中文](./README-CN.md)**
 
 # Stridon
 
@@ -15,9 +15,21 @@ Use it only for texts you are allowed to translate (your own documents, public d
 
 Python 3.10 or later.
 
+The simplest way is [pipx](https://pipx.pypa.io), which makes the `stridon` command available everywhere:
+
 ```shell
 git clone git@github.com:Rovig/stridon.git
+pipx install ./stridon
+```
+
+If `stridon` is then "command not found", run `pipx ensurepath` and open a new terminal. To update after a `git pull`: `pipx install --force ./stridon` (or install once with `pipx install -e ./stridon` so that changes to the code apply at once).
+
+Without pipx, install it in a virtual environment; the command is only available while the environment is active:
+
+```shell
 cd stridon
+python3 -m venv .venv
+source .venv/bin/activate
 pip install .
 ```
 
@@ -72,6 +84,7 @@ Notes:
 - **Claude:** if the model declines a passage, the request is automatically re-run on Anthropic's recommended fallback model.
 - **Gemini:** safety blocking is turned off; a blocked passage switches to the next model of `-m`. Use `--interval` to slow down requests.
 - **Qwen-MT:** a dedicated translation model; it ignores `--prompt` and uses `--context` as translation memory.
+- **Caiyun** only translates into Simplified Chinese, English and Japanese; **Tencent** into Simplified Chinese and English.
 - **Custom API:** Stridon sends `POST {"text", "source_lang", "target_lang"}` and reads `{"data": "<translation>"}`.
 - `--temperature`, `--source-lang`, `--extra-body '{"key": "value"}'` (added to each request of OpenAI-compatible services and Ollama) and `--proxy` are available for every service where they apply.
 
@@ -181,3 +194,5 @@ To use Ollama running on the host: `--api-base http://host.docker.internal:11434
 pip install -e ".[dev]"
 pytest
 ```
+
+How the code is organised, and how to add a service or a format: [docs/architecture.md](docs/architecture.md).

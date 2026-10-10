@@ -20,7 +20,7 @@ MAX_REQUESTS_PER_FILE = 40_000
 
 
 class BatchNotReady(Exception):
-    pass
+    """The OpenAI batch jobs have not finished yet."""
 
 
 def _check(translator):
@@ -29,6 +29,7 @@ def _check(translator):
 
 
 def submit(translator, texts: list[str], info_path: Path, name: str):
+    """Upload the texts as OpenAI batch jobs and save their ids to `info_path`."""
     _check(translator)
     texts = list(dict.fromkeys(texts))
     if not texts:
@@ -54,6 +55,7 @@ def submit(translator, texts: list[str], info_path: Path, name: str):
 
 
 def fetch(translator, info_path: Path, cache: TranslationCache, wait_seconds: int = 300):
+    """Wait (up to `wait_seconds`) for the batch jobs, then store their translations in the cache."""
     _check(translator)
     if not info_path.is_file():
         raise TranslationError(f"no submitted batch found ({info_path.name} is missing); run --batch-submit first")
