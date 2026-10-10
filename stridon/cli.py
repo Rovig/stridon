@@ -4,12 +4,13 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
 from stridon import batch, kobo
 from stridon.cache import TranslationCache
-from stridon.engine import Collected, Engine, EngineOptions
+from stridon.engine import Collected, Engine, EngineOptions, RangeNotFound
 from stridon.formats.common import DocumentOptions, Stopped
 from stridon.formats.epub_archive import EpubError
 from stridon.formats.web import WebError, is_url
@@ -31,8 +32,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     general = parser.add_argument_group("general")
     general.add_argument("-l", "--language", default="fr", help="target language, as a code (fr) or a name (French); default: fr")
-    general.add_argument("-o", "--output", type=Path, help="output file (default: <name>_bilingual.<ext> next to the input)")
-    general.add_argument("--only-translation", action="store_true", help="output the translation only, without the original")
+    general.add_argument("-o", "--output", type=Path, help="output file (default: <name>_<language>.<ext> next to the input)")
+    general.add_argument("--bilingual", action="store_true", help="alternate each original paragraph and its translation (default: translation only)")
     general.add_argument("--test", nargs="?", type=int, const=10, metavar="N", help="translate only the first N passages (default 10)")
     general.add_argument("--workers", type=int, default=1, metavar="N", help="number of requests sent in parallel")
     general.add_argument("--fresh", action="store_true", help="ignore translations saved by earlier runs")
@@ -55,7 +56,7 @@ def build_parser() -> argparse.ArgumentParser:
     grouping = parser.add_argument_group("requests and context")
     grouping.add_argument("--block-size", type=int, default=1, metavar="N", help="send N paragraphs per request")
     grouping.add_argument("--accumulated-tokens", type=int, default=0, metavar="N", help="group paragraphs into requests of up to N tokens")
-    grouping.add_argument("--sentence-mode", action="store_true", help="EPUB: show each sentence followed by its translation")
+    grouping.add_argument("--sentence-mode", action="store_true", help="EPUB: show each sentence followed by its translation (implies --bilingual)")
     grouping.add_argument("--context", nargs="?", type=int, const=3, default=0, metavar="N", help="send the last N translated paragraphs to the model (default 3)")
     grouping.add_argument("--batch-lines", type=int, default=10, metavar="N", help="TXT/PDF without blank lines: lines per passage (default 10)")
     grouping.add_argument("--batch-submit", action="store_true", help="OpenAI Batch API: submit all passages (half price, results within 24 h)")
@@ -67,10 +68,10 @@ def build_parser() -> argparse.ArgumentParser:
     epub.add_argument("--bare-text", action="store_true", help="also translate text that is outside the selected tags")
     epub.add_argument("--only-files", default="", help="translate only these chapter files (comma-separated)")
     epub.add_argument("--skip-files", default="", help="leave these chapter files untranslated (comma-separated)")
-    epub.add_argument("--style", default="", help="CSS style for the translations, e.g. 'color: #555; font-style: italic'")
-    epub.add_argument("--color", help="color of the translations, e.g. '#1e90ff'")
-    epub.add_argument("--retranslate", nargs="+", metavar="TEXT", help="translate again, in a bilingual EPUB, from the paragraph containing START to the one containing END")
-    epub.add_argument("--chapter", help="with --retranslate: chapter file to search")
+    epub.add_argument("--style", default="", help="with --bilingual: CSS style for the translations, e.g. 'color: #555'")
+    epub.add_argument("--color", help="with --bilingual: color of the translations, e.g. '#1e90ff'")
+    epub.add_argument("--retranslate", nargs="+", metavar="TEXT", help="translate again from the passage containing START to the one containing END, then rebuild the output (any format)")
+    epub.add_argument("--chapter", help="with --retranslate on an EPUB: chapter file to search")
     epub.add_argument("--extract", action="store_true", help="make a translation-only EPUB from a bilingual EPUB made by Stridon")
     epub.add_argument("--kobo", nargs="?", const="", metavar="FOLDER", help="pick a DRM-free book from a Kobo e-reader (its folder) or the Kobo app")
 
@@ -91,7 +92,7 @@ def _split(value: str) -> list[str]:
     return [v.strip() for v in value.split(",") if v.strip()]
 
 
-def _document_options(args, parser) -> DocumentOptions:
+def _document_options(args, parser, language: Language) -> DocumentOptions:
     try:
         width, height = (int(v) for v in args.min_image_size.lower().split("x"))
     except ValueError:
@@ -99,9 +100,14 @@ def _document_options(args, parser) -> DocumentOptions:
     if not 1 <= args.image_quality <= 100:
         parser.error("--image-quality must be between 1 and 100")
     style = args.style or (f"color: {args.color};" if args.color else "")
+    bilingual = args.bilingual or args.sentence_mode
+    if args.sentence_mode and not args.bilingual:
+        console.print("[dim]--sentence-mode shows the original sentences: bilingual output[/dim]")
+    language_tag = re.sub(r"[^\w-]+", "-", language.code).strip("-") or "translated"
     return DocumentOptions(
         output=args.output,
-        only_translation=args.only_translation,
+        bilingual=bilingual,
+        output_suffix="_bilingual" if bilingual else f"_{language_tag}",
         style=style,
         tags=_split(args.tags),
         exclude_tags=_split(args.exclude_tags),
@@ -138,11 +144,6 @@ def _run_document(source: str, engine: Engine, options: DocumentOptions, args) -
         return web.translate_url(source, engine, options)
     path = Path(source)
     suffix = path.suffix.lower()
-    if args.retranslate:
-        if suffix != ".epub":
-            raise EpubError("--retranslate works on EPUB books only")
-        start, end = args.retranslate[0], (args.retranslate[1] if len(args.retranslate) > 1 else None)
-        return epub.retranslate_epub(path, engine, options, start, end, args.chapter)
     handlers = {
         ".epub": epub.translate_epub,
         ".pdf": pdf.translate_pdf,
@@ -183,8 +184,8 @@ def main(argv=None) -> int:
             if path.suffix.lower() not in FORMATS:
                 parser.error(f"unsupported file type '{path.suffix}' (supported: {', '.join(sorted(FORMATS))})")
 
-        options = _document_options(args, parser)
         language = Language(args.language)
+        options = _document_options(args, parser, language)
         prompt = load_prompt(args.prompt)
         extra_body = json.loads(args.extra_body) if args.extra_body else None
         if extra_body is not None and not isinstance(extra_body, dict):
@@ -215,9 +216,6 @@ def main(argv=None) -> int:
             cache.clear()
         elif len(cache):
             console.print(f"[dim]{len(cache)} translations saved by an earlier run will be reused[/dim]")
-        if args.retranslate:
-            cache = TranslationCache(None)  # always ask for a new translation
-
         engine = Engine(translator, cache, EngineOptions(
             workers=max(1, args.workers),
             block_size=max(1, args.block_size),
@@ -225,6 +223,8 @@ def main(argv=None) -> int:
             context_limit=max(0, args.context or 0),
             test_limit=args.test,
             verbose=args.verbose,
+            retranslate=(args.retranslate[0], args.retranslate[1] if len(args.retranslate) > 1 else None,
+                         args.chapter) if args.retranslate else None,
         ))
 
         if args.batch_fetch:
@@ -255,7 +255,7 @@ def main(argv=None) -> int:
     except KeyboardInterrupt:
         console.print("[yellow]Interrupted.[/yellow]")
         return 130
-    except (TranslationError, FatalTranslationError, PromptError, EpubError, WebError,
+    except (TranslationError, FatalTranslationError, PromptError, EpubError, WebError, RangeNotFound,
             kobo.KoboError, batch.BatchNotReady, json.JSONDecodeError, OSError) as e:
         console.print(f"[red]✗ {e}[/red]")
         return 1

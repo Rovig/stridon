@@ -1,5 +1,5 @@
-"""EPUB books: bilingual translation, retranslation of a passage and
-extraction of the translation only."""
+"""EPUB books: translation (translation only or bilingual) and extraction
+of the translation from a bilingual book."""
 
 import copy
 import re
@@ -171,7 +171,7 @@ class _Chapter:
         original = _text_without(element, excluded)
         if re.sub(r"\s", "", original) == re.sub(r"\s", "", translation):
             return
-        if self.options.only_translation:
+        if not self.options.bilingual:
             kept = _carried(element, excluded)
             element.clear()
             element.append(translation)
@@ -188,7 +188,7 @@ class _Chapter:
 
     def _insert_sentences(self, element: Tag, sentences: list[str], translations: list[str]):
         element.clear()
-        if self.options.only_translation:
+        if not self.options.bilingual:
             element.append(" ".join(translations))
             return
         for sentence, translation in zip(sentences, translations):
@@ -202,7 +202,7 @@ class _Chapter:
                 element.append(" ")
 
     def _insert_string(self, string: NavigableString, translation: str):
-        if self.options.only_translation:
+        if not self.options.bilingual:
             string.replace_with(translation)
             return
         span = self.soup.new_tag("span")
@@ -267,46 +267,6 @@ def translate_epub(source: Path, engine: Engine, options: DocumentOptions) -> li
     return finish([out], error)
 
 
-def retranslate_epub(book_path: Path, engine: Engine, options: DocumentOptions,
-                     start: str, end: str | None = None, chapter_name: str | None = None) -> list[Path]:
-    """Translate again the passage from the paragraph containing `start`
-    to the one containing `end` in a bilingual book made by Stridon."""
-    book = EpubArchive(book_path)
-    tags = _effective_tags(options)
-    excluded = set(options.exclude_tags)
-    end = end or start
-
-    candidates = [p for p in book.documents if _chapter_selected(p, DocumentOptions(only_files=[chapter_name]))] \
-        if chapter_name else book.documents
-    for path in candidates:
-        soup = parse_document(book.entries[path])
-        originals = [e for e in _selected_elements(soup, tags)]
-        first = next((i for i, e in enumerate(originals) if start in e.get_text()), None)
-        if first is None:
-            continue
-        last = next((i for i in range(first, len(originals)) if end in originals[i].get_text()), None)
-        if last is None:
-            raise EpubError(f"no paragraph containing {end!r} was found after {start!r}")
-        selected = originals[first:last + 1]
-        for element in selected:
-            for inner in element.find_all(_has_marker):  # sentence-mode translations
-                inner.decompose()
-            following = element.find_next_sibling()
-            while following is not None and _has_marker(following):
-                next_one = following.find_next_sibling()
-                following.decompose()
-                following = next_one
-        units = [Unit(_text_without(e, excluded), scope=path) for e in selected]
-        results, error = translate(engine, units)
-        chapter = _Chapter(path, soup, options)
-        chapter.items = [("element", e, [i], None) for i, e in enumerate(selected)]
-        chapter.apply(results, excluded)
-        if error is None:
-            book.save(book_path, {path: serialize_document(soup)})
-        return finish([book_path], error)
-    raise EpubError(f"no paragraph containing {start!r} was found")
-
-
 def extract_translation(book_path: Path, output: Path | None = None) -> tuple[Path, int]:
     """Keep only the translations of a bilingual book made by Stridon."""
     book = EpubArchive(book_path)
@@ -354,7 +314,7 @@ def extract_translation(book_path: Path, output: Path | None = None) -> tuple[Pa
             count += 1
         replacements[path] = serialize_document(soup)
     if not replacements:
-        raise EpubError("this book contains no translation made by Stridon")
+        raise EpubError("this book contains no translation made by Stridon with --bilingual")
     out = Path(output) if output else book_path.with_name(f"{book_path.stem}_monolingual.epub")
     book.save(out, replacements)
     return out, count

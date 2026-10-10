@@ -32,6 +32,10 @@ class Unit:
     group: object = None  # units with the same group are sent in one request
 
 
+class RangeNotFound(Exception):
+    """--retranslate: the start or end text is not in the document."""
+
+
 class Collected(Exception):
     """Batch submit mode: the texts were collected, nothing is translated."""
 
@@ -54,6 +58,7 @@ class EngineOptions:
     test_limit: int | None = None
     verbose: bool = False
     collect: list | None = field(default=None)  # batch submit: gather texts instead of translating
+    retranslate: tuple | None = None  # (start text, end text or None, chapter or None)
 
 
 class Engine:
@@ -115,10 +120,11 @@ class Engine:
             eligible = eligible[:remaining]
             self._test_used += len(eligible)
 
+        forced = self._retranslate_range(units, eligible)
         first_index: dict[str, int] = {}
         pending = []
         for i in eligible:
-            cached = self.cache.get(units[i].text)
+            cached = None if units[i].text in forced else self.cache.get(units[i].text)
             if cached is not None:
                 results[i] = cached
             elif units[i].text not in first_index:
@@ -144,6 +150,27 @@ class Engine:
                 raise
         fill_repeats()
         return results
+
+    def _retranslate_range(self, units: list[Unit], eligible: list[int]) -> set[str]:
+        """Texts from the passage containing `start` to the one containing
+        `end`: they are translated again instead of read from the cache."""
+        if not self.options.retranslate:
+            return set()
+        start, end, chapter = self.options.retranslate
+        candidates = [
+            i for i in eligible
+            if not chapter or units[i].scope == chapter or units[i].scope.endswith("/" + chapter)
+        ]
+        first = next((k for k, i in enumerate(candidates) if start in units[i].text), None)
+        if first is None:
+            raise RangeNotFound(f"no passage containing {start!r} was found")
+        end = end or start
+        last = next((k for k in range(first, len(candidates)) if end in units[candidates[k]].text), None)
+        if last is None:
+            raise RangeNotFound(f"no passage containing {end!r} was found after {start!r}")
+        forced = {units[i].text for i in candidates[first:last + 1]}
+        console.print(f"[cyan]{len(forced)} passage(s) will be translated again[/cyan]")
+        return forced
 
     def _translate(self, units, pending, results, total, done_before):
         groups = self._groups(units, pending)

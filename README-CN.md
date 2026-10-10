@@ -2,7 +2,7 @@
 
 # Stridon
 
-Stridon 将图书、文档和网页文章制作成**双语版本**：每个段落后面紧跟其译文，译文由 AI 模型或在线翻译服务生成。
+Stridon 使用 AI 模型或在线翻译服务翻译图书、文档和网页文章。默认输出**译文文档**，并保留原有结构（章节、标题、图片、注释）；使用 `--bilingual` 时，每个原文段落后面紧跟其译文。
 
 - **格式：** EPUB、PDF（保留图片）、TXT、Markdown、SRT 字幕、网页文章（输出为 PDF 和/或 EPUB）
 - **服务：** Ollama（本地、免费）、OpenAI、Azure OpenAI、Claude、Gemini、DeepSeek、Groq、Mistral、OpenRouter、xAI、通义千问 Qwen-MT、Google 翻译、DeepL、彩云小译、腾讯交互翻译，以及自定义 API
@@ -39,9 +39,9 @@ stridon https://example.com/article -l zh -s google -f both
 stridon book.epub -l zh --test
 ```
 
-结果保存在原文件旁边，名为 `<文件名>_bilingual.<扩展名>`（网页文章保存在当前目录，以标题命名）。可用 `-o` 指定输出文件。
+结果保存在原文件旁边，名为 `<文件名>_<语言>.<扩展名>`，例如 `book_zh.epub`；使用 `--bilingual` 时为 `<文件名>_bilingual.<扩展名>`（网页文章保存在当前目录，以标题命名）。可用 `-o` 指定输出文件。在两种版式之间切换不会产生新的请求：已保存的译文会被复用。
 
-如果运行中断（出错、断网、Ctrl+C），会生成部分结果 `<文件名>_bilingual_temp.<扩展名>`。**再次运行同一条命令**即可继续：已翻译的段落会被复用，不会再次发送给服务。使用 `--fresh` 可从头开始。
+如果运行中断（出错、断网、Ctrl+C），会生成部分结果 `<文件名>_<语言>_temp.<扩展名>`。**再次运行同一条命令**即可继续：已翻译的段落会被复用，不会再次发送给服务。使用 `--fresh` 可从头开始。
 
 ## 翻译服务
 
@@ -101,7 +101,8 @@ stridon book.epub -l zh --test
 |---|---|
 | `-l, --language` | 目标语言，代码（`zh`、`zh-hant`、`ja`……）或英文名称（`Japanese`）；默认 `fr` |
 | `-o, --output` | 输出文件 |
-| `--only-translation` | 只保留译文，不保留原文 |
+| `--bilingual` | 原文段落与译文交替显示（默认：只输出译文） |
+| `--retranslate START [END]` | 重新翻译从包含 START 的段落到包含 END 的段落，然后重新生成输出；其余内容来自已保存的译文（适用于所有格式；`--chapter` 将搜索限定在某个 EPUB 章节文件中） |
 | `--test [N]` | 只翻译前 N 段（默认 10） |
 | `--workers N` | 同时发送 N 个请求 |
 | `--fresh` | 忽略之前保存的译文 |
@@ -115,7 +116,7 @@ stridon book.epub -l zh --test
 | `--context [N]` | 发送最近 N 段已翻译的段落（默认 3），使人名、语气和用词保持一致；此时各章节按顺序翻译 |
 | `--block-size N` | 每个请求发送 N 段 |
 | `--accumulated-tokens N` | 将段落合并为最多 N 个 token 的请求 |
-| `--sentence-mode` | EPUB：每句后面紧跟其译文 |
+| `--sentence-mode` | EPUB：每句后面紧跟其译文（双语输出） |
 
 ### OpenAI 批量 API（半价）
 
@@ -132,8 +133,7 @@ stridon book.epub -s openai --batch-fetch    # 24 小时内：取回结果并生
 | `--exclude-tags` | 不翻译的标签，如脚注标记和代码（默认 `sup,code`） |
 | `--bare-text` | 同时翻译不在上述标签内的文字 |
 | `--only-files`、`--skip-files` | 只翻译或跳过某些章节文件 |
-| `--style`、`--color` | 译文样式，例如 `--color "#1e90ff"` |
-| `--retranslate START [END]` | 在 Stridon 生成的双语 EPUB 中，重新翻译从包含 START 的段落到包含 END 的段落（用 `--chapter` 指定章节文件） |
+| `--style`、`--color` | 配合 `--bilingual`：译文样式，例如 `--color "#1e90ff"` |
 | `--extract` | 从 Stridon 生成的双语 EPUB 中提取仅含译文的 EPUB（`<文件名>_monolingual.epub`） |
 | `--kobo [目录]` | 从 Kobo 阅读器（其目录）或 Kobo 桌面应用中选择图书。仅支持无 DRM 的图书 |
 
@@ -141,8 +141,8 @@ stridon book.epub -s openai --batch-fetch    # 24 小时内：取回结果并生
 
 | 选项 | 说明 |
 |---|---|
-| `--pdf-mode enhanced` | 默认：逐页生成新的双语 PDF，图片保留在原位 |
-| `--pdf-mode simple` | 仅文字，输出 `<文件名>_bilingual.txt` 和 `.epub` |
+| `--pdf-mode enhanced` | 默认：生成新的 PDF，图片保留在原位。译文像重排的书一样跨页连续排列（标题保持较大字号，去掉原页码）；使用 `--bilingual` 时，每个原页面对应一页，原文为黑色、译文为蓝色 |
+| `--pdf-mode simple` | 仅文字，输出 `.txt` 和 `.epub` |
 | `--no-images` | 不保留图片 |
 | `--min-image-size WxH` | 忽略小于该尺寸的图片（默认 `50x50`） |
 | `--image-quality 1-100` | 重新压缩 JPEG 图片以减小体积（EPUB 同样适用）；100 表示不改动 |
@@ -159,7 +159,7 @@ stridon book.epub -s openai --batch-fetch    # 24 小时内：取回结果并生
 
 - **TXT：** 以空行分隔的文字块为段落（没有空行的文件按 `--batch-lines` 行分组）。
 - **Markdown：** 代码块和图片保持原样，标题和段落会被翻译。
-- **SRT：** 保留序号和时间轴，每条字幕先显示原文再显示译文。
+- **SRT：** 保留序号和时间轴，字幕显示译文（使用 `--bilingual` 时先显示原文再显示译文）。
 
 ## Docker
 

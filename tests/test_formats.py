@@ -18,7 +18,7 @@ from tests.conftest import FakeTranslator, make_engine
 def test_txt_paragraphs(tmp_path, fake):
     source = tmp_path / "notes.txt"
     source.write_text("First paragraph\nstill first.\n\nSecond.\n\n\n12\n")
-    out = translate_txt(source, make_engine(fake), DocumentOptions())[0]
+    out = translate_txt(source, make_engine(fake), DocumentOptions(bilingual=True))[0]
     assert out.read_text() == (
         "First paragraph\nstill first.\nFR: First paragraph\nstill first.\n\nSecond.\nFR: Second.\n\n12\n"
     )
@@ -27,7 +27,7 @@ def test_txt_paragraphs(tmp_path, fake):
 def test_txt_without_blank_lines_uses_line_groups(tmp_path, fake):
     source = tmp_path / "lines.txt"
     source.write_text("\n".join(f"line {i}" for i in range(5)))
-    translate_txt(source, make_engine(fake), DocumentOptions(batch_lines=2, only_translation=True))
+    translate_txt(source, make_engine(fake), DocumentOptions(batch_lines=2))
     assert fake.calls == ["line 0\nline 1", "line 2\nline 3", "line 4"]
 
 
@@ -35,7 +35,7 @@ def test_markdown_keeps_code(tmp_path, fake):
     source = tmp_path / "doc.md"
     source.write_text("# Title\nIntro text.\n\n```python\n# not a heading\n\nprint(1)\n```\n\n![img](a.png)\n")
     assert [ok for _, ok in split_markdown(source.read_text())] == [True, True, False, False]
-    out = translate_markdown(source, make_engine(fake), DocumentOptions())[0]
+    out = translate_markdown(source, make_engine(fake), DocumentOptions(bilingual=True))[0]
     text = out.read_text()
     assert "# Title\n\nFR: # Title" in text and text.count("print(1)") == 1
     assert fake.calls == ["# Title", "Intro text."]
@@ -44,7 +44,7 @@ def test_markdown_keeps_code(tmp_path, fake):
 def test_srt(tmp_path, fake):
     source = tmp_path / "film.srt"
     source.write_text("1\n00:00:01,000 --> 00:00:02,000\nHello\nthere\n\n2\n00:00:03,000 --> 00:00:04,000\nBye\n")
-    out = translate_srt(source, make_engine(fake), DocumentOptions())[0]
+    out = translate_srt(source, make_engine(fake), DocumentOptions(bilingual=True))[0]
     assert out.read_text() == (
         "1\n00:00:01,000 --> 00:00:02,000\nHello\nthere\nFR: Hello\nthere\n\n"
         "2\n00:00:03,000 --> 00:00:04,000\nBye\nFR: Bye\n"
@@ -70,7 +70,7 @@ def pdf(tmp_path):
 
 
 def test_pdf_enhanced(pdf, fake):
-    out = translate_pdf(pdf, make_engine(fake), DocumentOptions())[0]
+    out = translate_pdf(pdf, make_engine(fake), DocumentOptions(bilingual=True, output_suffix="_bilingual"))[0]
     result = pymupdf.open(out)
     text = " ".join(page.get_text() for page in result).replace("\n", " ")
     assert out.name == "report_bilingual.pdf"
@@ -80,16 +80,32 @@ def test_pdf_enhanced(pdf, fake):
 
 
 def test_pdf_cjk_text_is_rendered(pdf):
-    out = translate_pdf(pdf, make_engine(FakeTranslator(prefix="中文翻译")), DocumentOptions(only_translation=True))[0]
+    out = translate_pdf(pdf, make_engine(FakeTranslator(prefix="中文翻译")), DocumentOptions())[0]
     assert "中文翻译" in pymupdf.open(out)[0].get_text()
 
 
 def test_pdf_simple_mode(pdf, fake):
-    outputs = translate_pdf(pdf, make_engine(fake), DocumentOptions(pdf_mode="simple"))
+    outputs = translate_pdf(pdf, make_engine(fake), DocumentOptions(pdf_mode="simple", bilingual=True, output_suffix="_bilingual"))
     assert [p.name for p in outputs] == ["report_bilingual.txt", "report_bilingual.epub"]
     assert "FR: A paragraph" in outputs[0].read_text()
     with zipfile.ZipFile(outputs[1]) as z:
         etree.fromstring(z.read("OEBPS/chapter_000.xhtml"))
+
+
+def test_pdf_translation_flows_across_pages(tmp_path, fake):
+    source = tmp_path / "pages.pdf"
+    doc = pymupdf.open()
+    for number in range(1, 4):
+        page = doc.new_page()
+        page.insert_text((72, 72), f"Short text of page {number}.")
+        page.insert_text((300, 800), str(number))  # page number
+    doc.save(source)
+    out = translate_pdf(source, make_engine(fake), DocumentOptions(output_suffix="_fr"))[0]
+    result = pymupdf.open(out)
+    text = result[0].get_text()
+    assert out.name == "pages_fr.pdf" and len(result) == 1
+    assert text.split("\n")[:3] == [f"FR: Short text of page {n}." for n in (1, 2, 3)]  # no originals
+    assert "\n2\n" not in f"\n{text}"
 
 
 def test_caption_detection():
@@ -109,7 +125,8 @@ def test_web_article(tmp_path, monkeypatch, fake):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(web, "fetch", lambda url, agent: ARTICLE)
     monkeypatch.setattr(web, "EXTRACTORS", [("heuristics", web._with_heuristics)])
-    outputs = web.translate_url("https://example.com/a", make_engine(fake), DocumentOptions(output_format="both"))
+    outputs = web.translate_url("https://example.com/a", make_engine(fake),
+                                DocumentOptions(output_format="both", bilingual=True, output_suffix="_bilingual"))
     assert [p.name for p in outputs] == ["Bees  Hives_bilingual.pdf", "Bees  Hives_bilingual.epub"]
     assert fake.calls == ["Bees & Hives", "Honey bees live in colonies with a single queen.", "Summary",
                           "Workers forage for nectar & pollen < 5 km away."]
@@ -119,6 +136,19 @@ def test_web_article(tmp_path, monkeypatch, fake):
         chapter = z.read("OEBPS/chapter_000.xhtml")
     etree.fromstring(chapter)
     assert b"&amp; pollen &lt; 5 km" in chapter
+
+
+def test_web_translation_only(tmp_path, monkeypatch, fake):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(web, "fetch", lambda url, agent: ARTICLE)
+    monkeypatch.setattr(web, "EXTRACTORS", [("heuristics", web._with_heuristics)])
+    outputs = web.translate_url("https://example.com/a", make_engine(fake),
+                                DocumentOptions(output_format="epub", output_suffix="_fr"))
+    with zipfile.ZipFile(outputs[0]) as z:
+        chapter = z.read("OEBPS/chapter_000.xhtml").decode()
+    assert outputs[0].name == "Bees  Hives_fr.epub"
+    assert "<h1>FR: Bees &amp; Hives</h1>" in chapter and "<h1>Bees &amp; Hives</h1>" not in chapter
+    assert "<p>FR: Honey bees" in chapter and "<p>Honey bees" not in chapter
 
 
 def test_web_output_option(tmp_path, monkeypatch, fake):

@@ -2,7 +2,7 @@
 
 # Stridon
 
-Stridon turns books, documents and web articles into **bilingual editions**: every paragraph is followed by its translation, made by an AI model or an online translator.
+Stridon translates books, documents and web articles with an AI model or an online translator. By default you get the **translated document**, with its structure (chapters, headings, images, notes) kept; with `--bilingual`, every original paragraph is followed by its translation.
 
 - **Formats:** EPUB, PDF (with images), TXT, Markdown, SRT subtitles, web articles (to PDF and/or EPUB)
 - **Services:** Ollama (local, free), OpenAI, Azure OpenAI, Claude, Gemini, DeepSeek, Groq, Mistral, OpenRouter, xAI, Qwen-MT, Google Translate, DeepL, Caiyun, Tencent TranSmart, your own API
@@ -39,9 +39,9 @@ stridon https://example.com/article -l fr -s google -f both
 stridon book.epub -l fr --test
 ```
 
-The result is written next to the input as `<name>_bilingual.<ext>` (web articles: in the current folder, named after the title). Use `-o` to choose another file.
+The result is written next to the input as `<name>_<language>.<ext>`, e.g. `book_fr.epub`, or `<name>_bilingual.<ext>` with `--bilingual` (web articles: in the current folder, named after the title). Use `-o` to choose another file. Switching between the two layouts costs no new request: the saved translations are reused.
 
-If the run stops (error, network loss, Ctrl+C), a partial `<name>_bilingual_temp.<ext>` is written. **Run the same command again** to continue: passages already translated are reused and not sent to the service again. Use `--fresh` to start over.
+If the run stops (error, network loss, Ctrl+C), a partial `<name>_<language>_temp.<ext>` is written. **Run the same command again** to continue: passages already translated are reused and not sent to the service again. Use `--fresh` to start over.
 
 ## Translation services
 
@@ -102,7 +102,8 @@ Then `stridon book.epub --provider lmstudio`. `api_style` is one of `openai`, `c
 |---|---|
 | `-l, --language` | Target language, code (`fr`, `zh-hant`, `pt`...) or English name (`French`); default `fr` |
 | `-o, --output` | Output file |
-| `--only-translation` | Keep only the translation, not the original |
+| `--bilingual` | Alternate each original paragraph and its translation (default: translation only) |
+| `--retranslate START [END]` | Translate again the passages from the one containing START to the one containing END, then rebuild the output; everything else comes from the saved translations (any format; `--chapter` limits the search to one EPUB chapter file) |
 | `--test [N]` | Translate only the first N passages (default 10) |
 | `--workers N` | Send N requests in parallel |
 | `--fresh` | Ignore translations saved by earlier runs |
@@ -116,7 +117,7 @@ Then `stridon book.epub --provider lmstudio`. `api_style` is one of `openai`, `c
 | `--context [N]` | Send the last N translated paragraphs (default 3) so names, tone and vocabulary stay consistent; chapters are then translated in order |
 | `--block-size N` | Send N paragraphs per request |
 | `--accumulated-tokens N` | Group paragraphs into requests of up to N tokens |
-| `--sentence-mode` | EPUB: each sentence is followed by its translation |
+| `--sentence-mode` | EPUB: each sentence is followed by its translation (bilingual output) |
 
 Prompts using the 3-step format (`<step3_refined_translation>`) and reasoning models (`<think>`) are handled: only the final translation is kept.
 
@@ -135,8 +136,7 @@ stridon book.epub -s openai --batch-fetch    # within 24 h: loads the results an
 | `--exclude-tags` | Tags never translated, such as footnote marks and code (default `sup,code`) |
 | `--bare-text` | Also translate text that is not inside those tags |
 | `--only-files`, `--skip-files` | Translate only, or skip, some chapter files (e.g. `--skip-files toc.xhtml`) |
-| `--style`, `--color` | Style of the translations, e.g. `--color "#1e90ff"` |
-| `--retranslate START [END]` | In a bilingual EPUB made by Stridon, translate again from the paragraph containing START to the one containing END (`--chapter` to choose the chapter file) |
+| `--style`, `--color` | With `--bilingual`: style of the translations, e.g. `--color "#1e90ff"` |
 | `--extract` | Make a translation-only EPUB (`<name>_monolingual.epub`) from a bilingual EPUB made by Stridon |
 | `--kobo [FOLDER]` | Choose a book from a Kobo e-reader (its folder) or from the Kobo desktop app. Only DRM-free books can be translated |
 
@@ -146,8 +146,8 @@ Image descriptions (alt text) are translated too, unless `--no-captions` or `--n
 
 | Option | Description |
 |---|---|
-| `--pdf-mode enhanced` | Default: a new bilingual PDF, page by page, with the images in place |
-| `--pdf-mode simple` | Text only, written as `<name>_bilingual.txt` and `.epub` |
+| `--pdf-mode enhanced` | Default: a new PDF with the images in place. The translation flows from page to page like a reflowed book (headings stay larger, source page numbers are dropped); with `--bilingual`, each source page gives one page with the original in black and the translation in blue |
+| `--pdf-mode simple` | Text only, written as a `.txt` and an `.epub` |
 | `--no-images` | Leave images out |
 | `--min-image-size WxH` | Ignore images smaller than this (default `50x50`) |
 | `--image-quality 1-100` | Re-encode JPEG images to reduce size (also for EPUB); 100 keeps them unchanged |
@@ -164,7 +164,7 @@ Image descriptions (alt text) are translated too, unless `--no-captions` or `--n
 
 - **TXT:** paragraphs are the blocks separated by blank lines (files without blank lines are cut into groups of `--batch-lines` lines).
 - **Markdown:** code blocks and images are kept as they are; headings and paragraphs are translated.
-- **SRT:** numbers and timings are kept; each subtitle shows the original then the translation.
+- **SRT:** numbers and timings are kept; subtitles show the translation (with `--bilingual`, the original then the translation).
 
 ## Docker
 

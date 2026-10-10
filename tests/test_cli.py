@@ -28,12 +28,12 @@ def test_cli_translates_and_resumes(tmp_path, patched):
 
     patched.fail_after = 2
     assert cli.main([str(source), "-l", "fr"]) == 1
-    assert (tmp_path / "story_bilingual_temp.txt").exists()
+    assert (tmp_path / "story_fr_temp.txt").exists()
 
     patched.fail_after = None
     assert cli.main([str(source), "-l", "fr"]) == 0
     assert patched.created[-1].calls == ["Three."]  # the first two came from the cache
-    assert "FR: Three." in (tmp_path / "story_bilingual.txt").read_text()
+    assert (tmp_path / "story_fr.txt").read_text() == "FR: One.\n\nFR: Two.\n\nFR: Three.\n"
 
     assert cli.main([str(source), "-l", "fr", "--fresh"]) == 0
     assert patched.created[-1].calls == ["One.", "Two.", "Three."]
@@ -65,7 +65,17 @@ def test_cli_test_option_and_output(tmp_path, patched):
     out = tmp_path / "result.txt"
     assert cli.main([str(source), "--test", "1", "-o", str(out)]) == 0
     assert patched.created[-1].calls == ["A."]
-    assert out.read_text().startswith("A.\nFR: A.\n\nB.")
+    assert out.read_text() == "FR: A.\n\nB.\n\nC.\n"
+
+
+def test_cli_bilingual_and_retranslate(tmp_path, patched):
+    source = tmp_path / "s.txt"
+    source.write_text("Alpha.\n\nBeta.\n\nGamma.\n")
+    assert cli.main([str(source), "--bilingual"]) == 0
+    assert (tmp_path / "s_bilingual.txt").read_text().startswith("Alpha.\nFR: Alpha.")
+    assert cli.main([str(source), "--retranslate", "Beta"]) == 0
+    assert patched.created[-1].calls == ["Beta."]
+    assert cli.main([str(source), "--retranslate", "Nowhere"]) == 1
 
 
 def test_cli_extract_requires_stridon_book(tmp_path, patched):

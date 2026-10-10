@@ -29,7 +29,8 @@ from stridon.translators.base import console
 
 MARGIN = 50  # points
 SPACING = 6  # points after each block
-MAX_FONT_SIZE = 11
+MAX_FONT_SIZE = 11  # bilingual pages hold twice the text
+MAX_FLOW_FONT_SIZE = 20  # translation only: keeps headings larger than body text
 
 _CAPTION_LABEL = re.compile(
     r"^(Figure|Fig\.|Table|Image|Illustration|Diagram|Chart|Graph|Photo|Tableau|Figura|Tabla|Imagen|"
@@ -192,20 +193,25 @@ def translate_pdf(source: Path, engine: Engine, options: DocumentOptions) -> lis
     out = pymupdf.open()
     layout = _Layout(out)
     for width, height, blocks in pages[:last_page + 1]:
-        layout.new_page(width, height)
+        # Bilingual: one output page per source page. Translation only: the
+        # text flows from page to page like a reflowed book.
+        if options.bilingual or layout.page is None:
+            layout.new_page(width, height)
         for block in blocks:
             if block.kind == "image":
                 layout.image(block)
                 continue
-            size = min(block.font_size, MAX_FONT_SIZE)
             translation = translations[id(block)]
-            if translation is None:
-                layout.text(block.text, size, "#000000")
-                continue
-            if not options.only_translation:
-                layout.text(block.text, size, "#000000")
             italic = options.captions and looks_like_caption(block.text)
-            layout.text(translation, size, TRANSLATION_COLOR, italic=italic)
+            if options.bilingual:
+                size = min(block.font_size, MAX_FONT_SIZE)
+                layout.text(block.text, size, "#000000")
+                if translation is not None:
+                    layout.text(translation, size, TRANSLATION_COLOR, italic=italic)
+            elif translation is not None:
+                layout.text(translation, min(block.font_size, MAX_FLOW_FONT_SIZE), "#000000", italic=italic)
+            elif not block.text.replace(" ", "").isdigit():  # source page numbers are dropped
+                layout.text(block.text, min(block.font_size, MAX_FLOW_FONT_SIZE), "#000000")
 
     path = output_path(source, ".pdf", options, partial=error is not None)
     out.save(path, garbage=3, deflate=True)
@@ -223,7 +229,7 @@ def _translate_simple(source: Path, engine: Engine, options: DocumentOptions) ->
 
     parts, html = [], []
     for block, translation in zip(blocks, results):
-        if options.only_translation:
+        if not options.bilingual:
             parts.append(translation if translation is not None else block)
             html.append(f"<p>{escape(translation or block)}</p>")
         else:

@@ -6,7 +6,8 @@ import pytest
 from lxml import etree
 
 from stridon.formats.common import DocumentOptions, Stopped
-from stridon.formats.epub import extract_translation, retranslate_epub, translate_epub
+from stridon.engine import RangeNotFound
+from stridon.formats.epub import extract_translation, translate_epub
 from stridon.formats.epub_archive import EpubArchive, EpubError
 from tests.conftest import FakeTranslator, make_engine
 
@@ -69,7 +70,11 @@ def _chapter(path, name="OEBPS/text/ch1.xhtml") -> str:
 
 
 def _options(**kwargs):
-    return DocumentOptions(tags="p,h1,h2,li".split(","), **kwargs)
+    settings = {"tags": "p,h1,h2,li".split(","), "bilingual": True, "output_suffix": "_bilingual"}
+    settings.update(kwargs)
+    if not settings["bilingual"] and "output_suffix" not in kwargs:
+        settings["output_suffix"] = "_fr"
+    return DocumentOptions(**settings)
 
 
 def test_bilingual_epub(book, fake):
@@ -93,7 +98,7 @@ def test_bilingual_epub(book, fake):
 
 
 def test_only_translation_keeps_excluded_tags(book, fake):
-    html = _chapter(translate_epub(book, make_engine(fake), _options(only_translation=True))[0])
+    html = _chapter(translate_epub(book, make_engine(fake), _options(bilingual=False))[0])
     assert '<p id="p1">Bees live' not in html
     assert '<p id="p1">FR: Bees live in colonies.<sup>1</sup></p>' in html
 
@@ -119,7 +124,7 @@ def test_line_breaks_separate_words(book, fake):
 
 
 def test_only_translation_keeps_anchors(book, fake):
-    html = _chapter(translate_epub(book, make_engine(fake), _options(only_translation=True))[0])
+    html = _chapter(translate_epub(book, make_engine(fake), _options(bilingual=False))[0])
     assert '<a href="notes.xhtml#n1" id="r1"><sup>2</sup></a>' in html
 
 
@@ -181,13 +186,23 @@ def test_extract_translation(book, fake):
         extract_translation(book)
 
 
-def test_retranslate(book, fake):
-    bilingual = translate_epub(book, make_engine(fake), _options())[0]
+def test_retranslate_uses_the_cache_for_everything_else(tmp_path, book, fake):
+    cache = tmp_path / "cache.jsonl"
+    translate_epub(book, make_engine(fake, cache), _options(bilingual=False))
     again = FakeTranslator(prefix="NEW:")
-    retranslate_epub(bilingual, make_engine(again), _options(), "Bees live", "Use")
-    html = _chapter(bilingual)
+    out = translate_epub(book, make_engine(again, cache, retranslate=("Bees live", "Use", "ch1.xhtml")),
+                         _options(bilingual=False))[0]
+    html = _chapter(out)
     assert again.calls == ["Bees live in colonies.", "Use carefully. Then wait."]
-    assert "NEW: Bees live in colonies." in html and "FR: Bees live in colonies." not in html
-    assert "FR: Last paragraph." in html  # outside the range: unchanged
-    with pytest.raises(EpubError, match="Nowhere"):
-        retranslate_epub(bilingual, make_engine(again), _options(), "Bees live", "Nowhere")
+    assert "NEW: Bees live in colonies." in html and "FR: Last paragraph." in html
+    assert "Wasps live" not in " ".join(again.calls)  # other chapter untouched
+    with pytest.raises(RangeNotFound, match="Nowhere"):
+        translate_epub(book, make_engine(again, cache, retranslate=("Bees live", "Nowhere", None)), _options())
+
+
+def test_translation_only_is_the_default(book, fake):
+    out = translate_epub(book, make_engine(fake), DocumentOptions(output_suffix="_fr"))[0]
+    html = _chapter(out)
+    assert out.name == "bees_fr.epub"
+    assert "stridon-translation" not in html and "<p>FR: Last paragraph.</p>" in html
+    assert re.search(r'<p id="p1">FR: Bees live in colonies.<sup>1</sup></p>', html)

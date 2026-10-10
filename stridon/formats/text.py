@@ -40,7 +40,7 @@ def translate_txt(source: Path, engine: Engine, options: DocumentOptions) -> lis
 
     parts = []
     for block, translation in zip(blocks, results):
-        if options.only_translation:
+        if not options.bilingual:
             parts.append(translation if translation is not None else block)
         else:
             parts.append(block if translation is None else f"{block}\n{translation}")
@@ -100,7 +100,7 @@ def translate_markdown(source: Path, engine: Engine, options: DocumentOptions) -
     for (block, _), translation in zip(blocks, results):
         if translation is None:
             parts.append(block)
-        elif options.only_translation:
+        elif not options.bilingual:
             parts.append(translation)
         else:
             parts.extend([block, translation])
@@ -131,7 +131,7 @@ def translate_srt(source: Path, engine: Engine, options: DocumentOptions) -> lis
     for (number, timing, text), translation in zip(cues, results):
         if translation is None:
             content = text
-        elif options.only_translation:
+        elif not options.bilingual:
             content = translation
         else:
             content = f"{text}\n{translation}"

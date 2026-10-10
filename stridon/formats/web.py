@@ -147,16 +147,32 @@ h1.translation, h2.translation, h3.translation, h4.translation, h5.translation, 
 """
 
 
-def _article_html(title, url, paragraphs, results, only_translation) -> str:
-    parts = [f"<h1>{escape(title)}</h1>", f'<p class="source">Source: {escape(url)}</p>']
+def _blocks(paragraphs, results, bilingual, original_class="", translation_class="translation") -> list[str]:
+    """HTML of the article body: alternating, or the translation only."""
+    parts = []
     for (tag, text), translation in zip(paragraphs, results):
         tag = "p" if tag in ("li", "blockquote") else tag
-        if translation is None:
-            parts.append(f'<{tag} class="original">{escape(text)}</{tag}>')
-            continue
-        if not only_translation:
-            parts.append(f'<{tag} class="original">{escape(text)}</{tag}>')
-        parts.append(f'<{tag} class="translation">{escape(translation)}</{tag}>')
+        if bilingual or translation is None:
+            attr = f' class="{original_class}"' if original_class and bilingual else ""
+            parts.append(f"<{tag}{attr}>{escape(text)}</{tag}>")
+        if translation is not None:
+            attr = f' class="{translation_class}"' if bilingual else ""
+            parts.append(f"<{tag}{attr}>{escape(translation)}</{tag}>")
+    return parts
+
+
+def _heading(title, translated_title, bilingual, translation_class) -> list[str]:
+    if not translated_title:
+        return [f"<h1>{escape(title)}</h1>"]
+    if bilingual:
+        return [f"<h1>{escape(title)}</h1>", f'<h1 class="{translation_class}">{escape(translated_title)}</h1>']
+    return [f"<h1>{escape(translated_title)}</h1>"]
+
+
+def _article_html(title, translated_title, url, paragraphs, results, bilingual) -> str:
+    parts = _heading(title, translated_title, bilingual, "translation")
+    parts.append(f'<p class="source">Source: {escape(url)}</p>')
+    parts += _blocks(paragraphs, results, bilingual, original_class="original")
     return "\n".join(parts)
 
 
@@ -185,14 +201,11 @@ def write_pdf(path: Path, title: str, body_html: str):
     doc.close()
 
 
-def _epub_body(title, url, paragraphs, results, only_translation) -> str:
-    parts = [f"<h1>{escape(title)}</h1>", f'<p class="source">Source: <a href="{escape(url)}">{escape(url)}</a></p>', "<hr/>"]
-    for (tag, text), translation in zip(paragraphs, results):
-        tag = "p" if tag in ("li", "blockquote") else tag
-        if translation is None or not only_translation:
-            parts.append(f"<{tag}>{escape(text)}</{tag}>")
-        if translation is not None:
-            parts.append(f'<{tag} class="stridon-translation">{escape(translation)}</{tag}>')
+def _epub_body(title, translated_title, url, paragraphs, results, bilingual) -> str:
+    parts = _heading(title, translated_title, bilingual, "stridon-translation")
+    parts.append(f'<p class="source">Source: <a href="{escape(url)}">{escape(url)}</a></p>')
+    parts.append("<hr/>")
+    parts += _blocks(paragraphs, results, bilingual, translation_class="stridon-translation")
     return "\n".join(parts)
 
 
@@ -200,25 +213,30 @@ def translate_url(url: str, engine: Engine, options: DocumentOptions) -> list[Pa
     html = fetch(url, options.user_agent)
     title = page_title(html)
     paragraphs = extract_article(html, url)
-    results, error = translate(engine, [Unit(text) for _, text in paragraphs])
+    if paragraphs and paragraphs[0][0] == "h1" and paragraphs[0][1] == title:
+        paragraphs = paragraphs[1:]  # the title is shown once, as the heading
+    results, error = translate(engine, [Unit(title)] + [Unit(text) for _, text in paragraphs])
+    translated_title, results = results[0], results[1:]
+    display_title = translated_title if translated_title and not options.bilingual else title
 
-    suffix = "_bilingual_temp" if error is not None else "_bilingual"
+    temp = "_temp" if error is not None else ""
     if options.output:
         output = Path(options.output)
         stem = output.stem if output.suffix.lower() in (".pdf", ".epub") else output.name
-        base = output.parent / (stem + ("_temp" if error is not None else ""))
+        base = output.parent / (stem + temp)
     else:
-        base = Path.cwd() / f"{safe_filename(title, 'article')}{suffix}"
+        base = Path.cwd() / f"{safe_filename(title, 'article')}{options.output_suffix}{temp}"
 
     outputs = []
     if options.output_format in ("pdf", "both"):
         pdf = base.parent / (base.name + ".pdf")
-        write_pdf(pdf, title, _article_html(title, url, paragraphs, results, options.only_translation))
+        write_pdf(pdf, display_title,
+                  _article_html(title, translated_title, url, paragraphs, results, options.bilingual))
         outputs.append(pdf)
     if options.output_format in ("epub", "both"):
         epub = base.parent / (base.name + ".epub")
-        write_epub(epub, title, engine.translator.language.code,
-                   [(title, _epub_body(title, url, paragraphs, results, options.only_translation))],
+        write_epub(epub, display_title, engine.translator.language.code,
+                   [(display_title, _epub_body(title, translated_title, url, paragraphs, results, options.bilingual))],
                    identifier=url)
         outputs.append(epub)
     return finish(outputs, error)

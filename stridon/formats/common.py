@@ -13,8 +13,9 @@ TRANSLATION_COLOR = "#1e90ff"
 @dataclass
 class DocumentOptions:
     output: Path | None = None
-    only_translation: bool = False
-    style: str = ""  # CSS for translated paragraphs (EPUB)
+    bilingual: bool = False  # True: original and translation alternate
+    output_suffix: str = "_translated"  # e.g. "_fr", or "_bilingual"
+    style: str = ""  # CSS for translated paragraphs (bilingual EPUB)
     # EPUB
     tags: list[str] = field(default_factory=lambda: ["p"])
     exclude_tags: list[str] = field(default_factory=lambda: ["sup", "code"])
@@ -59,11 +60,11 @@ def finish(outputs: list[Path], error: BaseException | None) -> list[Path]:
 
 
 def output_path(source: Path, extension: str, options: DocumentOptions, partial: bool) -> Path:
-    """<dir>/<stem>_bilingual<ext>, or --output; '_temp' is added when partial."""
+    """<dir>/<stem>_<lang><ext> (or _bilingual), or --output; '_temp' is added when partial."""
     if options.output:
         path = Path(options.output)
         return path.with_name(f"{path.stem}_temp{path.suffix}") if partial else path
-    suffix = "_bilingual_temp" if partial else "_bilingual"
+    suffix = options.output_suffix + ("_temp" if partial else "")
     return source.with_name(f"{source.stem}{suffix}{extension}")
 
 
