@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-24.04
     strategy:
       matrix:
-        python-version: ["3.10", "3.12", "3.13"]
+        python-version: ["3.10", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -17,3 +17,10 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[dev]"
       - run: pytest -q
+
+  docker:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker build -t stridon .
+      - run: docker run --rm stridon --help
