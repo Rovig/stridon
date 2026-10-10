@@ -94,7 +94,6 @@ class ServiceConfig:
     extra_body: dict | None = None
     interval: float = 0.0
     azure_deployment: str | None = None
-    api_style: str | None = None  # for --provider
 
 
 def http_error(response: requests.Response, service: str) -> TranslationError:
@@ -130,7 +129,6 @@ class Translator:
     """A translation service. Subclasses implement translate()."""
 
     name = "translator"
-    is_llm = False
 
     def __init__(self, config: ServiceConfig):
         self.config = config

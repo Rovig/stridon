@@ -28,7 +28,6 @@ _SPLIT = re.compile(r"^\s*@@\s*$", re.M)
 class LLMTranslator(Translator):
     """Base for LLM services: subclasses only implement `_complete`."""
 
-    is_llm = True
     default_system = ""
     attempts = 3
     min_wait = 2.0

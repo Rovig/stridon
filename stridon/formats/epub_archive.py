@@ -61,9 +61,6 @@ class EpubArchive:
                 if entry[0] in self.entries and entry[0] not in self.documents:
                     self.documents.append(entry[0])
 
-        title = opf.find("title")
-        self.title = title.get_text(strip=True) if title else self.path.stem
-
     def images(self) -> list[str]:
         """Paths of the image entries listed in the manifest."""
         return [path for path, media, _ in self.manifest.values() if media.startswith("image/") and path in self.entries]
